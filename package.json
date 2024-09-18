@@ -11,5 +11,11 @@
   "description": "",
   "dependencies": {
     "puppeteer": "^23.3.1"
+  },
+  "nodemonConfig": {
+    "ext": "js,html"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.5"
   }
 }

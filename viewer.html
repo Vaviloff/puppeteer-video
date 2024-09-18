@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Video Stream Viewer</title>
+</head>
+<body>
+  <video id="videoElement" autoplay controls width="320" height="240"></video>
+  <br>
+  <textarea id="status" cols="40" rows="10"></textarea>
+  <script>
+    const video = document.getElementById('videoElement');
+    const status = document.getElementById('status');
+    const mediaSource = new MediaSource();
+    video.src = URL.createObjectURL(mediaSource);
+
+    video.addEventListener('error', (event) => {
+      console.error('Video error:', event.target.error);
+    });
+    
+    video.addEventListener('loadedmetadata', () => {
+      console.log('Loaded metadata');
+    });
+
+    video.addEventListener('loadeddata', () => {
+      console.log('Loaded data');
+    });
+
+    video.addEventListener('canplay', () => {
+      console.log('Can play');
+    });
+
+    video.addEventListener('play', () => {
+      console.log('Playing');
+    });
+
+    mediaSource.addEventListener("sourceended", function() {
+      console.log("Media source ended");
+    });
+
+    mediaSource.addEventListener("sourceclose", function() {
+      console.log("Media source closed");
+    });
+
+    mediaSource.addEventListener("error", function(e) {
+      console.error("Media source error:", e);
+    });
+
+    mediaSource.addEventListener('sourceopen', () => {
+      status.textContent = 'MediaSource opened';
+      const sourceBuffer = mediaSource.addSourceBuffer('video/webm;codecs=vp8');
+      const ws = new WebSocket('ws://localhost:8080');
+
+      ws.onopen = () => {
+        status.textContent += '\nWebSocket connected';
+      };
+
+      ws.onmessage = async (event) => {
+        status.textContent += '\nReceived chunk of size: ' + event.data.size;
+        console.log(typeof event.data);
+
+        const blob = new Blob([event.data]);
+        const data = await blob.arrayBuffer();
+
+        if (!sourceBuffer.updating) {
+          sourceBuffer.appendBuffer(data);
+        } else {
+          console.log("Waiting for previous append to complete...");
+        }
+      };
+
+      ws.onerror = (error) => {
+        status.textContent += '\nWebSocket error: ' + error.message;
+      };
+
+      sourceBuffer.addEventListener('updateend', () => {
+        status.textContent += '\nSource buffer updated';
+      });
+    });
+
+    video.addEventListener('error', (e) => {
+      status.textContent += '\nVideo error: ' + video.error.message;
+    });
+  </script>
+</body>
+</html>
