@@ -2,19 +2,34 @@ const puppeteer = require('puppeteer');
 const http = require('http');
 const WebSocket = require('ws');
 const fs = require('fs');
+const clients = new Set();
+let initSegment = null;
+
 async function startBrowserAndStream() {
   const browser = await puppeteer.launch({
     headless: false,
     args: [
       '--use-fake-ui-for-media-stream',
-      '--allow-file-access-from-files',  // Allows file access
+      '--allow-file-access-from-files', // Allows file access
       '--auto-select-desktop-capture-source=Entire screen', // Auto-select screen capture
       '--no-sandbox', // Disable sandbox, useful for some environments
       '--disable-dev-shm-usage', // Increase shared memory usage if needed
       '--auto-accept-this-tab-capture',
       '--disable-infobars',
       `--window-size=1920,1080`,
-    ]
+    ],
+  });
+
+  // Set up a WebSocket server for streaming video chunks
+  const wss = new WebSocket.Server({ port: 8080 });
+  wss.on('connection', (ws) => {
+    console.log('Client connected');
+
+    if (initSegment) {
+      console.log('Sending initialization segment to new client');
+      ws.send(initSegment);
+    }
+    clients.add(ws);
   });
 
   const page = await browser.newPage();
@@ -23,6 +38,34 @@ async function startBrowserAndStream() {
   // Navigate to the page you want to capture
   await page.goto('https://codepen.io/yudizsolutions/full/mdgpBZg');
 
+  page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
+
+  page.exposeFunction('sendVideoChunk', (chunk) => {
+    if (!initSegment) {
+      console.log('Received and stored initialization segment');
+      initSegment = chunk;
+    }
+
+    for (const client of clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        console.log(`Sending chunk of size: ${chunk.length}`);
+        client.send(Buffer.from(chunk));
+      }
+    }
+  });
+
+  page.evaluate(() => {
+    console.log(`Adding event listener for video chunks`);
+    window.addEventListener('message', async (event) => {
+      console.log('Received message:', event.data);
+      if (event.data.type === 'videoChunk') {
+        const arrayBuffer = await event.data.chunk.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        await window.sendVideoChunk(Array.from(uint8Array));
+      }
+    });
+  });
+
   // Inject the MediaRecorder script
   await page.evaluate(() => {
     window.videoStream = null;
@@ -30,71 +73,49 @@ async function startBrowserAndStream() {
 
     const displayMediaOptions = {
       video: {
-        displaySurface: "browser",
+        displaySurface: 'browser',
       },
       // audio: {
       //   suppressLocalAudioPlayback: false,
       // },
       preferCurrentTab: false,
-      selfBrowserSurface: "exclude",
-      systemAudio: "exclude",
-      surfaceSwitching: "include",
-      monitorTypeSurfaces: "include",
+      selfBrowserSurface: 'exclude',
+      systemAudio: 'exclude',
+      surfaceSwitching: 'include',
+      monitorTypeSurfaces: 'include',
     };
 
     async function startCapture() {
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
+        const stream =
+          await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
         window.videoStream = stream;
-        
+
         const mimeType = 'video/webm;codecs=vp8';
         window.mediaRecorder = new MediaRecorder(stream, { mimeType });
 
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
-            console.log(`Captured chunk of size: ${event.data.size} and type ${event.data.type}`);
-            window.postMessage({
-              type: 'videoChunk',
-              chunk: event.data
-            }, '*');
+            console.log(
+              `Captured chunk of size: ${event.data.size} and type ${event.data.type}`,
+            );
+            window.postMessage(
+              {
+                type: 'videoChunk',
+                chunk: event.data,
+              },
+              '*',
+            );
           }
         };
 
-        mediaRecorder.start(3000); // Capture in 1-second chunks
+        mediaRecorder.start(1000); // Capture in 1-second chunks
       } catch (err) {
-        console.error("Error: " + err);
+        console.error('Error: ' + err);
       }
     }
 
     startCapture();
-  });
-
-  // Set up a WebSocket server for streaming video chunks
-  const wss = new WebSocket.Server({ port: 8080 });
-
-  wss.on('connection', (ws) => {
-    console.log('Client connected');
-
-    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-
-    page.exposeFunction('sendVideoChunk', (chunk) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        console.log(`Sending chunk of size: ${chunk.length}`);
-        ws.send(Buffer.from(chunk));
-      }
-    });
-
-    page.evaluate(() => {
-      console.log(`Adding event listener for video chunks`);
-      window.addEventListener('message', async (event) => {
-        console.log('Received message:', event.data);
-        if (event.data.type === 'videoChunk') {
-          const arrayBuffer = await event.data.chunk.arrayBuffer();
-          const uint8Array = new Uint8Array(arrayBuffer);
-          await window.sendVideoChunk(Array.from(uint8Array));
-        }
-      });
-    });
   });
 
   // Create a simple HTML page for viewing the stream
