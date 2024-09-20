@@ -41,8 +41,7 @@
       };
 
       ws.onmessage = async (event) => {
-        const blob = new Blob([event.data]);
-        const data = await blob.arrayBuffer();
+        const data = await event.data.arrayBuffer();
 
         if (!isInitialized) {
           sourceBuffer.appendBuffer(data);
