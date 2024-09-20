@@ -4,13 +4,21 @@
   <title>Video Stream Viewer</title>
 </head>
 <body>
-  <video id="videoElement" autoplay controls width="320" height="240"></video>
+  <div style="position: relative; width: 640px; height: 320px; border: 2px solid rgb(52, 52, 129); border-radius: 5px">
+    <div style="display: inline-block; padding: 5px 10px; 
+    background: rgb(192, 59, 59); color: white; 
+    font-weight: bold; position: absolute; left: 0; top: 0;z-index: 1">LIVE FEED</div>
+    <video id="videoElement" controls 
+    width="640" height="320" 
+    style=""></video>
+  </div>
   <br>
-  <textarea id="status" cols="40" rows="10"></textarea>
+  <textarea id="status" style="width:640px; height: 320px"></textarea>
   <script>
     const video = document.getElementById('videoElement');
     const status = document.getElementById('status');
     const mediaSource = new MediaSource();
+    let isPlaying = false;
     video.src = URL.createObjectURL(mediaSource);
 
     video.addEventListener('error', (event) => {
@@ -65,6 +73,11 @@
           sourceBuffer.appendBuffer(data);
         } else {
           console.log("Waiting for previous append to complete...");
+        }
+
+        if (!isPlaying) {
+          video.play();
+          isPlaying = true;
         }
       };
 
