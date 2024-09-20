@@ -8,7 +8,8 @@
     <div style="display: inline-block; padding: 5px 10px; 
     background: rgb(192, 59, 59); color: white; 
     font-weight: bold; position: absolute; left: 0; top: 0;z-index: 1">LIVE FEED</div>
-    <video id="videoElement" controls 
+
+    <video id="videoElement" controls muted autoplay
     width="640" height="320" 
     style=""></video>
   </div>
@@ -20,60 +21,72 @@
     const mediaSource = new MediaSource();
     let sourceBuffer;
     let isInitialized = false;
-    let pendingChunks = [];
 
     video.src = URL.createObjectURL(mediaSource);
 
-    function appendChunk(chunk) {
-      if (!sourceBuffer.updating && pendingChunks.length > 0) {
-        const nextChunk = pendingChunks.shift();
-        sourceBuffer.appendBuffer(nextChunk);
-      }
+    function log(message) {
+      // console.log(message);
+      status.value += message + '\n';
+      // status.scrollTop = status.scrollHeight;
     }
 
     mediaSource.addEventListener('sourceopen', () => {
-      status.textContent = 'MediaSource opened';
+      log('MediaSource opened');
       sourceBuffer = mediaSource.addSourceBuffer('video/webm;codecs=vp8');
       const ws = new WebSocket('ws://localhost:8080');
 
       ws.onopen = () => {
-        status.textContent += '\nWebSocket connected';
+        log('WebSocket connected');
       };
 
       ws.onmessage = async (event) => {
         const data = await event.data.arrayBuffer();
+        log(`Received chunk of size: ${data.byteLength}`);
 
-        if (!isInitialized) {
-          sourceBuffer.appendBuffer(data);
-          isInitialized = true;
-          status.textContent += '\nInitialization segment received and appended';
-        } else {
-          if (!sourceBuffer.updating) {
+        if (!sourceBuffer.updating) {
+          try {
             sourceBuffer.appendBuffer(data);
-          } else {
-            pendingChunks.push(data);
+            if (!isInitialized) {
+              isInitialized = true;
+              log('Initialization segment appended');
+            }
+          } catch (e) {
+            log(`Error appending buffer: ${e.message}`);
           }
-          status.textContent += '\nReceived and queued chunk of size: ' + event.data.size;
+        } else {
+          log('Source buffer is updating, waiting...');
         }
 
-        if (video.paused) {
-          video.play().catch(e => console.error('Error playing video:', e));
-        }
+        // if (video.paused && sourceBuffer.buffered.length > 0) {
+        //   video.currentTime = sourceBuffer.buffered.start(0);
+        //   video.play().catch(e => log(`Error playing video: ${e.message}`));
+        // }
       };
 
       ws.onerror = (error) => {
-        status.textContent += '\nWebSocket error: ' + error.message;
+        log(`WebSocket error: ${error.message}`);
       };
 
       sourceBuffer.addEventListener('updateend', () => {
-        status.textContent += '\nSource buffer updated';
-        appendChunk();
+        log('Source buffer updated');
       });
     });
 
     video.addEventListener('error', (e) => {
-      status.textContent += '\nVideo error: ' + video.error.message;
+      log(`Video error: ${video.error.message}`);
     });
+
+    // Additional event listeners for debugging
+    video.addEventListener('loadedmetadata', () => log('Video loadedmetadata'));
+    video.addEventListener('loadeddata', () => log('Video loadeddata'));
+    video.addEventListener('canplay', () => log('Video canplay'));
+    video.addEventListener('play', () => log('Video play'));
+    video.addEventListener('pause', () => log('Video pause'));
+    video.addEventListener('error', (event) => {
+      console.error('Video error:', event.target.error);
+      log(`Video error: ${event.target.error.message}`);
+    });
+    mediaSource.addEventListener('sourceended', () => log('MediaSource ended'));
   </script>
 </body>
 </html>

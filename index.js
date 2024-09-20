@@ -25,11 +25,11 @@ async function startBrowserAndStream() {
   wss.on('connection', (ws) => {
     console.log('Client connected');
 
+    clients.add(ws);
     if (initSegment) {
       console.log('Sending initialization segment to new client');
       ws.send(initSegment);
     }
-    clients.add(ws);
   });
 
   const page = await browser.newPage();
@@ -92,7 +92,10 @@ async function startBrowserAndStream() {
         window.videoStream = stream;
 
         const mimeType = 'video/webm;codecs=vp8';
-        window.mediaRecorder = new MediaRecorder(stream, { mimeType });
+        window.mediaRecorder = new MediaRecorder(stream, { 
+          mimeType,
+          videoKeyFrameIntervalDuration: 15,          
+         });
 
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
