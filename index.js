@@ -12,13 +12,16 @@ async function startBrowserAndStream() {
       '--no-sandbox', // Disable sandbox, useful for some environments
       '--disable-dev-shm-usage', // Increase shared memory usage if needed
       '--auto-accept-this-tab-capture',
+      '--disable-infobars',
+      `--window-size=1280,720`,
     ]
   });
 
   const page = await browser.newPage();
+  page.setViewport({ width: 1280, height: 720 });
 
   // Navigate to the page you want to capture
-  await page.goto('https://example.com');
+  await page.goto('https://codepen.io/yudizsolutions/full/mdgpBZg');
 
   // Inject the MediaRecorder script
   await page.evaluate(() => {
@@ -78,7 +81,6 @@ async function startBrowserAndStream() {
       if (ws.readyState === WebSocket.OPEN) {
         console.log(`Sending chunk of size: ${chunk.length}`);
         ws.send(Buffer.from(chunk));
-        require('fs').writeFileSync('chunk.webm', Buffer.from(chunk));
       }
     });
 
