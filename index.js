@@ -13,12 +13,12 @@ async function startBrowserAndStream() {
       '--disable-dev-shm-usage', // Increase shared memory usage if needed
       '--auto-accept-this-tab-capture',
       '--disable-infobars',
-      `--window-size=1280,720`,
+      `--window-size=1920,1080`,
     ]
   });
 
   const page = await browser.newPage();
-  page.setViewport({ width: 1280, height: 720 });
+  page.setViewport({ width: 1920, height: 1080 });
 
   // Navigate to the page you want to capture
   await page.goto('https://codepen.io/yudizsolutions/full/mdgpBZg');
