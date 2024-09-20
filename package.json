@@ -16,6 +16,7 @@
     "ext": "js,html"
   },
   "devDependencies": {
-    "nodemon": "^3.1.5"
+    "nodemon": "^3.1.5",
+    "prettier": "^3.3.3"
   }
 }
