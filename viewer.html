@@ -33,6 +33,7 @@
     mediaSource.addEventListener('sourceopen', () => {
       log('MediaSource opened');
       sourceBuffer = mediaSource.addSourceBuffer('video/webm;codecs=vp8');
+      sourceBuffer.mode = 'sequence';
       const ws = new WebSocket('ws://localhost:8080');
 
       ws.onopen = () => {
@@ -46,10 +47,7 @@
         if (!sourceBuffer.updating) {
           try {
             sourceBuffer.appendBuffer(data);
-            if (!isInitialized) {
-              isInitialized = true;
-              log('Initialization segment appended');
-            }
+            log('Segment appended');
           } catch (e) {
             log(`Error appending buffer: ${e.message}`);
           }
