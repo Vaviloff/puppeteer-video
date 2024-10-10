@@ -4,9 +4,13 @@ const http = require('http');
 const WebSocket = require('ws');
 const fs = require('fs');
 const clients = new Set();
+const { exec } = require('child_process');
 let initSegment = null;
 
 async function startBrowserAndStream() {
+  const xvfb = exec('Xvfb :99 -screen 0 1280x720x24');
+  process.env.DISPLAY = ':99';
+
   const browser = await puppeteer.launch({
     headless: false,
     args: [
@@ -63,7 +67,7 @@ async function startBrowserAndStream() {
   await page.evaluate(() => {
     console.log(`Adding event listener for video chunks`);
     window.addEventListener('message', async (event) => {
-      console.log('Received message:', event.data);
+      // console.log('Received message:', event.data);
       if (event.data.type === 'videoChunk') {
         const arrayBuffer = await event.data.chunk.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
@@ -111,7 +115,7 @@ async function startBrowserAndStream() {
         mediaRecorder.ondataavailable = (blob) => {          
           if (true) {
             console.log(
-              `Captured chunk of size: ${blob.length}`,
+              `Captured video chunk`,
             );
 
             const file = new File(
@@ -164,6 +168,7 @@ async function startBrowserAndStream() {
 
   // Cleanup function
   async function cleanup() {
+    xvfb.kill();
     await browser.close();
     server.close();
     wss.close();
